@@ -3,6 +3,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+# from sys import path
+# print(path)
+# from pointmaze.maze_model import MazeEnv
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,7 +58,6 @@ class Critic(nn.Module):
 
 	def Q1(self, state, action):
 		sa = torch.cat([state, action], 1)
-
 		q1 = F.relu(self.l1(sa))
 		q1 = F.relu(self.l2(q1))
 		q1 = self.l3(q1)
@@ -100,11 +102,22 @@ class TD3_BC(object):
 		return self.actor(state).cpu().data.numpy().flatten()
 
 
-	def train(self, replay_buffer, batch_size=256):
+	def train(self, replay_buffer, prev_actor_loss, batch_size=256, is_sparse=True):
 		self.total_it += 1
+		# obj = MazeEnv()
 
 		# Sample replay buffer 
 		state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
+		# target_loc_tensor = torch.tensor(MazeEnv.get_target(obj)).repeat(state.shape[0],1)
+		# target_loc_tensor = target_loc_tensor.to(device=device)
+		# print(state.shape, torch.tensor(MazeEnv.get_target(obj)).shape)
+		# print(next_state.shape, reward.shape, action.shape)
+		# print(state.shape, target_loc_tensor.shape)
+		# if is_sparse == True and torch.linalg.norm(state[:,0:2] - target_loc_tensor) <=0.5:
+		#  	reward = torch.exp(-torch.linalg.norm(state[:,0:2] - target_loc_tensor))
+		#print(reward)
+		#if not_done.any() == False:
+		#print(reward, self.total_it)
 
 		with torch.no_grad():
 			# Select action according to policy and add clipped noise
@@ -132,6 +145,8 @@ class TD3_BC(object):
 		critic_loss.backward()
 		self.critic_optimizer.step()
 
+		actor_loss = prev_actor_loss
+
 		# Delayed policy updates
 		if self.total_it % self.policy_freq == 0:
 
@@ -153,6 +168,8 @@ class TD3_BC(object):
 
 			for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
 				target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+		
+		return actor_loss, critic_loss, self.total_it
 
 
 	def save(self, filename):

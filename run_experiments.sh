@@ -20,12 +20,8 @@ envs=(
 	"walker2d-medium-replay-v0"
 	)
 
-for ((i=0;i<5;i+=1))
-do 
-	for env in ${envs[*]}
-	do
-		python main.py \
-		--env $env \
-		--seed $i
-	done
+for env in ${envs[*]}
+do
+	python main.py \
+	--env $env 
 done
