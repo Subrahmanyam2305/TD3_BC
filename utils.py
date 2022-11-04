@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import random
 
 
 class ReplayBuffer(object):
@@ -40,40 +41,48 @@ class ReplayBuffer(object):
 		)
 
 
-	def convert_D4RL(self, dataset, sparse = False):
+	def convert_D4RL(self, dataset, sparse = False, mask_percent = 1):
 		if sparse:
 			self.state = dataset['observations']
 			self.action = dataset['actions']
 			self.next_state = dataset['next_observations']
 			self.reward = dataset['rewards'].reshape(-1,1)
+			new_reward = np.zeros_like(self.reward)
+			mask = np.zeros_like(self.reward)
 			self.not_done = 1. - dataset['terminals'].reshape(-1,1)
-			# print(dataset['rewards'].shape)
-			# print(self.reward.shape)
+
+			for k in range(self.reward.shape[0]):
+				if dataset['timeouts'][k] or dataset['terminals'][k]:
+					mask[k] = 1
+			# i = 1
+			# while i <= mask_percent * self.reward.shape[0]:
+			# 	j = np.random.randint(self.reward.shape[0])
+			# 	if mask[j] == 1:
+			# 		continue
+			# 	mask[j] = 1
+			# 	i += 1
+			sampled = random.sample(range(int(mask_percent*self.reward.shape[0])), k = int(mask_percent*self.reward.shape[0]))
+			for i in sampled:
+				mask[i] = 1
 			add = 0
-			# for i in range(-1, 1000000, 1000):
-			# 	print(dataset['terminals'][i], i)
-			# prev = 0
-			# for i in range(dataset['rewards'].shape[0]):
-			# 	if dataset['terminals'][i]:
-			# 		print(i, i - prev)
-			# 		prev = i
-			# # 		#print(dataset['rewards'][i], i)
-			for i in range(dataset['rewards'].shape[0]):
-				if dataset['terminals'][i]:
-					self.reward[i] = add
-					self.reward[int(i/2)] = add/2
+			print("Mask created!!")
+			for i in range(dataset['rewards'].shape[0]-1, -1, -1):
+				add += self.reward[i]
+				new_reward[i] = add
+				if i > 0 and dataset['terminals'][i] or dataset['timeouts'][i]:
 					add = 0
-					#print(self.reward[i], i)
-				else:
-					add += self.reward[i]
-					self.reward[i] = 0
+			self.reward = np.multiply(new_reward, mask)
+			print("New reward calculated!!")
 			self.size = self.state.shape[0]
 		else:
+			#print(dataset.keys())
 			self.state = dataset['observations']
 			self.action = dataset['actions']
 			self.next_state = dataset['next_observations']
 			self.reward = dataset['rewards'].reshape(-1,1)
 			self.not_done = 1. - dataset['terminals'].reshape(-1,1)
+			#self.info = dataset['infos/qpos']
+			#print(self.info)
 			self.size = self.state.shape[0]
 
 
