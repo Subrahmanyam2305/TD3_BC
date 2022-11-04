@@ -28,6 +28,7 @@ def eval_policy(policy, env_name, seed, mean, std, iteration, seed_offset=100, e
 			# 	avg_reward += cumulative_reward
 			# else:
 			# 	avg_reward += reward
+			avg_reward += reward
 
 	avg_reward /= eval_episodes
 	d4rl_score = eval_env.get_normalized_score(avg_reward) * 100
@@ -51,6 +52,7 @@ if __name__ == "__main__":
 	parser.add_argument("--max_timesteps", default=1e6, type=int)   # Max time steps to run environment
 	parser.add_argument("--save_model", default=True, action="store_true")        # Save model and optimizer parameters
 	parser.add_argument("--load_model", default="")                 # Model load file name, "" doesn't load, "default" uses file_name
+	parser.add_argument("--mask_percent", default=1.0)   # Mask percent in float
 	# TD3
 	parser.add_argument("--expl_noise", default=0.1)                # Std of Gaussian exploration noise
 	parser.add_argument("--batch_size", default=256, type=int)      # Batch size for both actor and critic
@@ -64,12 +66,13 @@ if __name__ == "__main__":
 	parser.add_argument("--normalize", default=True)
 	args = parser.parse_args()
 
-	file_name = f"{args.policy}_{args.env}_{args.seed}"
+	args.mask_percent = float(args.mask_percent)
+	file_name = f"{args.policy}_{args.env}_{args.seed}_{args.mask_percent}"
 	print("---------------------------------------")
-	print(f"Policy: {args.policy}, Env: {args.env}, Evaluation Env: {args.eval_env}, Seed: {args.seed}, {args.save_model}")
+	print(f"Policy: {args.policy}, Env: {args.env}, Evaluation Env: {args.eval_env}, Mask Percent: {args.mask_percent}, Seed: {args.seed}, {args.save_model}")
 	print("---------------------------------------")
 
-	log_path = 'Results7/{}/{}'.format(args.env,datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+	log_path = 'Results7/{}/{}/{}'.format(args.env,args.mask_percent, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 	writer = SummaryWriter(log_path)
 
 	# if not os.path.exists("./results7"):
@@ -116,7 +119,7 @@ if __name__ == "__main__":
 	replay_buffer = utils.ReplayBuffer(state_dim, action_dim)
 	# dataset = h5py.File('./single_reward_dataset/maze2d-open-v0.hdf5','r')
 	# replay_buffer.convert_D4RL(d4rl.qlearning_dataset(env, dataset = dataset))
-	replay_buffer.convert_D4RL(d4rl.qlearning_dataset(env), sparse = True)
+	replay_buffer.convert_D4RL(env.get_dataset(), sparse = True, mask_percent = args.mask_percent)
 	#print(args.env + "  " + str(replay_buffer.size))
 	if args.normalize:
 		mean,std = replay_buffer.normalize_states() 
@@ -135,7 +138,7 @@ if __name__ == "__main__":
 			print(f"Time steps: {t+1}")
 			evaluations.append(eval_policy(policy, args.eval_env, args.seed, mean, std, t))
 			#np.save(f"./results7/{file_name}", evaluations)
-			if args.save_model: policy.save(f"./models7/{file_name}_{t+1}")
+			if args.save_model: policy.save(f"./models7/{args.mask_percent}/{file_name}_{t+1}")
 		
 		if t + 1 == int(args.max_timesteps):
 			writer.add_text('Env_name', str(args.env))
