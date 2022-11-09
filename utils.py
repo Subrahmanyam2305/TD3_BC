@@ -50,26 +50,19 @@ class ReplayBuffer(object):
 			new_reward = np.zeros_like(self.reward)
 			mask = np.zeros_like(self.reward)
 			self.not_done = 1. - dataset['terminals'].reshape(-1,1)
-
+			prev_k = 0
 			for k in range(self.reward.shape[0]):
-				if dataset['timeouts'][k] or dataset['terminals'][k]:
+				if dataset['timeouts'][k] or dataset['terminals'][k]: # find end of trajectory
 					mask[k] = 1
-			# i = 1
-			# while i <= mask_percent * self.reward.shape[0]:
-			# 	j = np.random.randint(self.reward.shape[0])
-			# 	if mask[j] == 1:
-			# 		continue
-			# 	mask[j] = 1
-			# 	i += 1
-			sampled = random.sample(range(int(mask_percent*self.reward.shape[0])), k = int(mask_percent*self.reward.shape[0]))
-			for i in sampled:
-				mask[i] = 1
+					for j in range(prev_k + int( (k - prev_k) * (1 - mask_percent) ),k): # last mask_percent appended with 1
+						mask[j] = 1
+					prev_k = k
 			add = 0
 			print("Mask created!!")
-			for i in range(dataset['rewards'].shape[0]-1, -1, -1):
-				add += self.reward[i]
+			for i in range(dataset['rewards'].shape[0]-1, -1, -1): # rtg
+				add += self.reward[i] # add = g* add + self.reward[i]
 				new_reward[i] = add
-				if i > 0 and dataset['terminals'][i] or dataset['timeouts'][i]:
+				if i > 0 and (dataset['terminals'][i] or dataset['timeouts'][i]):
 					add = 0
 			self.reward = np.multiply(new_reward, mask)
 			print("New reward calculated!!")
